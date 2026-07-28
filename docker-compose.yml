@@ -2,8 +2,11 @@
 # No se usa sola normalmente; se combina con docker-compose.override.yml
 # (automatico) o con docker-compose.prod.yml (explicito).
 #
-# No se declara servicio de base de datos: MySQL vive en el servidor
-# remoto (136.65.217.165) y se accede via las variables DB_* del .env.
+# No se declara servicio de base de datos: MySQL vive en el mismo servidor
+# (o en uno remoto) y se accede via las variables DB_* del .env.
+#
+# No se declara servicio de Nginx: en produccion es nativo (con el
+# certificado de Certbot), no dockerizado. Ver docs/despliegue.md.
 
 services:
   web:
@@ -12,9 +15,16 @@ services:
     env_file:
       - .env
     volumes:
-      - media_volume:/app/media
+      # Bind mount (no volumen nombrado): mismo `media/` del repo tanto en
+      # dev como en prod, para que Nginx nativo pueda servirlo directo por
+      # filesystem sin tener que buscarlo dentro del storage interno de Docker.
+      - ./media:/app/media
     expose:
       - "8000"
-
-volumes:
-  media_volume:
+    # Permite que el contenedor llegue al MySQL que corre en el MISMO host
+    # via host.docker.internal, por si conectarse a la IP externa de la VM
+    # desde la propia VM no funciona (hairpin NAT no siempre esta soportado
+    # en la red de GCP). Solo hace falta si cambias DB_HOST a
+    # host.docker.internal en el .env del servidor; no rompe nada si no se usa.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
