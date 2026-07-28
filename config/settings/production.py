@@ -15,6 +15,11 @@ SECURE_HSTS_SECONDS = 60 * 60 * 24 * 30 if SECURE_SSL_REDIRECT else 0
 SECURE_HSTS_INCLUDE_SUBDOMAINS = SECURE_SSL_REDIRECT
 SECURE_HSTS_PRELOAD = SECURE_SSL_REDIRECT
 
+# Nginx (nativo, fuera de Docker) termina el TLS y le hace proxy a gunicorn
+# por HTTP simple. Sin esto, Django no tiene forma de saber que la conexion
+# original era HTTPS y con SECURE_SSL_REDIRECT=True entra en loop de redirects.
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
 STORAGES = {
     'default': {
         'BACKEND': 'django.core.files.storage.FileSystemStorage',

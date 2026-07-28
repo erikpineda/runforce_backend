@@ -1,7 +1,12 @@
 # Override de PRODUCCION.
 # Se debe indicar explicitamente con -f (no se carga solo, a diferencia de
-# docker-compose.override.yml). Usa gunicorn (CMD del Dockerfile) y agrega
-# Nginx como entrada publica (unico servicio con puertos hacia el host).
+# docker-compose.override.yml). Usa gunicorn (CMD del Dockerfile).
+#
+# Nginx corre NATIVO en el host (con el certificado de Certbot para
+# runforce.space), no en Docker: aca solo publicamos el puerto de gunicorn
+# en loopback (127.0.0.1:8000) para que ese Nginx nativo le haga proxy.
+# No se publica en 0.0.0.0: asi el backend no queda expuesto directo a
+# internet, solo alcanzable a traves de Nginx. Ver docs/despliegue.md.
 #
 # DJANGO_SETTINGS_MODULE se fuerza aqui a proposito: el `env_file: .env` de
 # docker-compose.yml carga lo que haya en tu .env local (normalmente
@@ -15,14 +20,5 @@ services:
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.production
     restart: unless-stopped
-
-  nginx:
-    image: nginx:1.27-alpine
-    restart: unless-stopped
-    depends_on:
-      - web
     ports:
-      - "80:80"
-    volumes:
-      - ./deploy/nginx/conf.d:/etc/nginx/conf.d:ro
-      - media_volume:/app/media:ro
+      - "127.0.0.1:8000:8000"
