@@ -1,0 +1,15 @@
+venv/
+env/
+.venv/
+__pycache__/
+*.pyc
+.git/
+.gitignore
+.env
+.env.example
+db.sqlite3
+staticfiles/
+media/
+docs/
+README.md
+.claude/

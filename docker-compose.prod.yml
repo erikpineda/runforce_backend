@@ -1,0 +1,28 @@
+# Override de PRODUCCION.
+# Se debe indicar explicitamente con -f (no se carga solo, a diferencia de
+# docker-compose.override.yml). Usa gunicorn (CMD del Dockerfile) y agrega
+# Nginx como entrada publica (unico servicio con puertos hacia el host).
+#
+# DJANGO_SETTINGS_MODULE se fuerza aqui a proposito: el `env_file: .env` de
+# docker-compose.yml carga lo que haya en tu .env local (normalmente
+# development/DEBUG=True para trabajar dia a dia), y `environment:` siempre
+# gana sobre `env_file:` sin importar en que archivo este declarado. Sin este
+# override explicito, un .env mal configurado en el servidor levantaria
+# produccion en modo development por accidente.
+
+services:
+  web:
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings.production
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    depends_on:
+      - web
+    ports:
+      - "80:80"
+    volumes:
+      - ./deploy/nginx/conf.d:/etc/nginx/conf.d:ro
+      - media_volume:/app/media:ro

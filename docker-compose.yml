@@ -1,0 +1,20 @@
+# Base: configuracion COMUN a development y production.
+# No se usa sola normalmente; se combina con docker-compose.override.yml
+# (automatico) o con docker-compose.prod.yml (explicito).
+#
+# No se declara servicio de base de datos: MySQL vive en el servidor
+# remoto (136.65.217.165) y se accede via las variables DB_* del .env.
+
+services:
+  web:
+    build: .
+    image: runforce-api:latest
+    env_file:
+      - .env
+    volumes:
+      - media_volume:/app/media
+    expose:
+      - "8000"
+
+volumes:
+  media_volume:

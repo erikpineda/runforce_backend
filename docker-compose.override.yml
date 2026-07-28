@@ -1,0 +1,17 @@
+# Override de DESARROLLO.
+# Docker Compose carga este archivo automaticamente junto a docker-compose.yml
+# cuando ejecutas `docker compose up` sin pasar -f explicitos.
+#
+# Cambia el comando a runserver (autoreload), monta el codigo fuente como
+# volumen para ver cambios sin reconstruir la imagen, y publica el puerto
+# 8000 directo al host (sin pasar por Nginx).
+
+services:
+  web:
+    command: python manage.py runserver 0.0.0.0:8000
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings.development
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
