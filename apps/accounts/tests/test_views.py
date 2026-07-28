@@ -43,6 +43,17 @@ class RegistroYLoginFlowTests(APITestCase):
         self.assertEqual(respuesta.status_code, status.HTTP_200_OK)
         self.assertIn('access', respuesta.data)
 
+    def test_registro_rechaza_pais_invalido(self):
+        registro_url = reverse('auth-registro')
+        respuesta = self.client.post(registro_url, {
+            'nombre_completo': 'Runner Invalido',
+            'correo': 'invalido@example.com',
+            'password': 'clave-segura-123',
+            'pais': 'XX',
+        })
+        self.assertEqual(respuesta.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(Usuario.objects.filter(correo='invalido@example.com').exists())
+
     def test_login_pendiente_es_rechazado(self):
         Usuario.objects.create_user(
             correo='pendiente@example.com', password='clave-segura-123',

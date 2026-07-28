@@ -1,11 +1,14 @@
 from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 
+from apps.common.validators import validar_codigo_pais
+
 from .models import Usuario
 
 
 class RegistroSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, validators=[validate_password])
+    pais = serializers.CharField(validators=[validar_codigo_pais])
 
     class Meta:
         model = Usuario
@@ -39,6 +42,8 @@ class ResetPasswordSerializer(serializers.Serializer):
 
 
 class UsuarioSerializer(serializers.ModelSerializer):
+    pais = serializers.CharField(validators=[validar_codigo_pais])
+
     class Meta:
         model = Usuario
         fields = [
