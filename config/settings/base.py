@@ -190,6 +190,7 @@ SPECTACULAR_SETTINGS = {
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
     'TAGS': [
+        {'name': 'Comun', 'description': 'Catalogos compartidos (paises, etc).'},
         {'name': 'Autenticacion', 'description': 'Registro, OTP, login local/Google, JWT, recuperacion de password.'},
         {'name': 'Usuarios', 'description': 'Perfil del usuario autenticado.'},
         {'name': 'Carreras', 'description': 'Registro y consulta de carreras (actividades).'},
