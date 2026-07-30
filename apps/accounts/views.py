@@ -18,6 +18,7 @@ from .serializers import (
     FotoPerfilRespuestaSerializer,
     FotoPerfilSerializer,
     GoogleAuthSerializer,
+    LoginSerializer,
     MensajeConTokensSerializer,
     MensajeSerializer,
     OlvidePasswordSerializer,
@@ -104,12 +105,17 @@ class VerificarOTPView(APIView):
 @extend_schema(
     tags=[TAG_AUTH],
     summary='Login con correo y password',
-    description='Autentica un usuario local activo y devuelve un par de tokens JWT (access + refresh).',
+    description=(
+        'Autentica un usuario local activo y devuelve un par de tokens JWT (access + refresh). '
+        'Mensajes de error especificos: correo inexistente, cuenta pendiente de verificacion, '
+        'cuenta de Google (sin password), o contraseña incorrecta.'
+    ),
     responses={200: TokenSerializer},
 )
 @method_decorator(ratelimit(key=RATE_AUTH, rate='10/m', method='POST', block=True), name='post')
 class LoginView(TokenObtainPairView):
     """Login local. Usa el campo `correo` (USERNAME_FIELD) y `password`."""
+    serializer_class = LoginSerializer
 
 
 @extend_schema(tags=[TAG_AUTH], summary='Refrescar access token')
@@ -181,10 +187,10 @@ class OlvidePasswordView(APIView):
         tags=[TAG_AUTH],
         summary='Solicitar codigo de recuperacion de password',
         description=(
-            'Envia un OTP tipo `reset_password` al correo si pertenece a un usuario local. '
-            'Si el correo existe pero es una cuenta de Google, responde con un aviso explicito '
-            '(esas cuentas no tienen password que restablecer). Si el correo no existe, responde '
-            'el mismo mensaje generico que un envio exitoso, para no filtrar informacion.'
+            'Envia un OTP tipo `reset_password` al correo, si pertenece a un usuario local. '
+            'Mensajes especificos: correo inexistente, o cuenta de Google (sin password que restablecer). '
+            'Nota: esto revela si un correo esta registrado (se prioriza la claridad del mensaje '
+            'sobre ocultar la existencia de la cuenta).'
         ),
         request=OlvidePasswordSerializer,
         responses={200: MensajeSerializer},
@@ -193,15 +199,17 @@ class OlvidePasswordView(APIView):
         serializer = OlvidePasswordSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        usuario = Usuario.objects.filter(correo=serializer.validated_data['correo']).first()
+        try:
+            usuario = Usuario.objects.get(correo=serializer.validated_data['correo'])
+        except Usuario.DoesNotExist:
+            raise ValidationError('No existe una cuenta con este correo.')
 
-        if usuario is not None and usuario.provider == Usuario.PROVIDER_GOOGLE:
+        if usuario.provider == Usuario.PROVIDER_GOOGLE:
             raise ValidationError('Esta cuenta inicio sesion con Google. No tiene password para restablecer.')
 
-        if usuario is not None:
-            generar_y_enviar_otp(usuario, CodigoOTP.TIPO_RESET_PASSWORD)
+        generar_y_enviar_otp(usuario, CodigoOTP.TIPO_RESET_PASSWORD)
 
-        return Response({'mensaje': 'Si el correo existe, se envio un codigo de recuperacion.'})
+        return Response({'mensaje': 'Se envio un codigo de recuperacion a tu correo.'})
 
 
 @method_decorator(ratelimit(key=RATE_AUTH, rate='10/m', method='POST', block=True), name='post')

@@ -65,6 +65,32 @@ class RegistroYLoginFlowTests(APITestCase):
             'password': 'clave-segura-123',
         })
         self.assertEqual(respuesta.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertIn('pendiente', str(respuesta.data).lower())
+
+    def test_login_correo_inexistente_es_especifico(self):
+        respuesta = self.client.post(reverse('auth-login'), {
+            'correo': 'no-existe@example.com',
+            'password': 'lo-que-sea',
+        })
+        self.assertEqual(respuesta.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertIn('no existe', str(respuesta.data).lower())
+
+    def test_login_password_incorrecto_es_especifico(self):
+        Usuario.objects.create_user(
+            correo='activo2@example.com', password='clave-correcta-123',
+            nombre_completo='Activo2', pais='HN', estado=Usuario.ESTADO_ACTIVO,
+        )
+        respuesta = self.client.post(reverse('auth-login'), {
+            'correo': 'activo2@example.com',
+            'password': 'clave-incorrecta',
+        })
+        self.assertEqual(respuesta.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertIn('incorrecta', str(respuesta.data).lower())
+
+    def test_olvide_password_correo_inexistente_es_especifico(self):
+        respuesta = self.client.post(reverse('auth-olvide-password'), {'correo': 'no-existe@example.com'})
+        self.assertEqual(respuesta.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('no existe', str(respuesta.data).lower())
 
 
 class GoogleAuthTests(APITestCase):

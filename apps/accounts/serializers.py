@@ -1,5 +1,7 @@
 from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
+from rest_framework.exceptions import AuthenticationFailed
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 from apps.common.validators import validar_codigo_pais
 
@@ -29,6 +31,36 @@ class VerificarOTPSerializer(serializers.Serializer):
 
 class GoogleAuthSerializer(serializers.Serializer):
     id_token = serializers.CharField()
+
+
+class LoginSerializer(TokenObtainPairSerializer):
+    """
+    Igual que TokenObtainPairSerializer, pero con mensajes de error especificos
+    en vez del generico "No active account found with the given credentials"
+    de simplejwt.
+    """
+
+    def validate(self, attrs):
+        correo = attrs.get(self.username_field)
+        password = attrs.get('password')
+
+        try:
+            usuario = Usuario.objects.get(correo=correo)
+        except Usuario.DoesNotExist:
+            raise AuthenticationFailed('No existe una cuenta con este correo.')
+
+        if usuario.provider == Usuario.PROVIDER_GOOGLE:
+            raise AuthenticationFailed('Esta cuenta inicia sesion con Google. Usa esa opcion para ingresar.')
+
+        if usuario.estado != Usuario.ESTADO_ACTIVO:
+            raise AuthenticationFailed(
+                'Tu cuenta esta pendiente de verificacion. Revisa tu correo por el codigo OTP.'
+            )
+
+        if not usuario.check_password(password):
+            raise AuthenticationFailed('Contraseña incorrecta.')
+
+        return super().validate(attrs)
 
 
 class OlvidePasswordSerializer(serializers.Serializer):
