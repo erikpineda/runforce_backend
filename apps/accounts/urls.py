@@ -12,4 +12,5 @@ urlpatterns = [
     path('auth/reset-password', views.ResetPasswordView.as_view(), name='auth-reset-password'),
     path('usuarios/me', views.UsuarioMeView.as_view(), name='usuario-me'),
     path('usuarios/me/foto', views.FotoPerfilView.as_view(), name='usuario-me-foto'),
+    path('usuarios/me/password', views.CambiarPasswordView.as_view(), name='usuario-me-password'),
 ]

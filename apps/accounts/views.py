@@ -14,9 +14,11 @@ from rest_framework_simplejwt.views import TokenRefreshView as SimpleJWTTokenRef
 
 from .models import CodigoOTP, Usuario
 from .serializers import (
+    CambiarPasswordSerializer,
     FotoPerfilRespuestaSerializer,
     FotoPerfilSerializer,
     GoogleAuthSerializer,
+    MensajeConTokensSerializer,
     MensajeSerializer,
     OlvidePasswordSerializer,
     RegistroSerializer,
@@ -124,7 +126,9 @@ class GoogleAuthView(APIView):
         summary='Login / registro con Google Sign-In',
         description=(
             'Valida el `idToken` de Google contra los servidores de Google. Si el usuario no existe, '
-            'lo crea activo con `provider=google`. Devuelve tokens JWT.'
+            'lo crea activo con `provider=google`. Devuelve tokens JWT. Si ya existe una cuenta local '
+            '(`provider=local`) con ese correo, se rechaza para evitar que Google tome control de una '
+            'cuenta que no le pertenece.'
         ),
         request=GoogleAuthSerializer,
         responses={200: TokenSerializer},
@@ -139,23 +143,32 @@ class GoogleAuthView(APIView):
         correo = idinfo.get('email')
 
         usuario = Usuario.objects.filter(google_id=google_id).first()
+
         if usuario is None:
-            usuario, creado = Usuario.objects.get_or_create(
-                correo=correo,
-                defaults={
-                    'nombre_completo': idinfo.get('name', correo),
-                    'pais': '',
-                    'foto_url': idinfo.get('picture'),
-                    'provider': Usuario.PROVIDER_GOOGLE,
-                    'google_id': google_id,
-                    'estado': Usuario.ESTADO_ACTIVO,
-                },
-            )
-            if not creado and not usuario.google_id:
-                usuario.google_id = google_id
-                usuario.provider = Usuario.PROVIDER_GOOGLE
-                usuario.estado = Usuario.ESTADO_ACTIVO
-                usuario.save(update_fields=['google_id', 'provider', 'estado'])
+            usuario_existente = Usuario.objects.filter(correo=correo).first()
+
+            if usuario_existente is not None:
+                if usuario_existente.provider == Usuario.PROVIDER_LOCAL:
+                    raise ValidationError(
+                        'Ya existe una cuenta local con este correo. Inicia sesion con tu password '
+                        'en vez de con Google.'
+                    )
+                # Cuenta google preexistente sin google_id (no deberia pasar, pero por las dudas
+                # se vincula en vez de crear un duplicado).
+                usuario_existente.google_id = google_id
+                usuario_existente.estado = Usuario.ESTADO_ACTIVO
+                usuario_existente.save(update_fields=['google_id', 'estado'])
+                usuario = usuario_existente
+            else:
+                usuario = Usuario.objects.create(
+                    correo=correo,
+                    nombre_completo=idinfo.get('name', correo),
+                    pais='',
+                    foto_url=idinfo.get('picture'),
+                    provider=Usuario.PROVIDER_GOOGLE,
+                    google_id=google_id,
+                    estado=Usuario.ESTADO_ACTIVO,
+                )
 
         return Response(_tokens_para(usuario))
 
@@ -169,7 +182,9 @@ class OlvidePasswordView(APIView):
         summary='Solicitar codigo de recuperacion de password',
         description=(
             'Envia un OTP tipo `reset_password` al correo si pertenece a un usuario local. '
-            'Siempre responde el mismo mensaje generico, exista o no la cuenta, para no filtrar informacion.'
+            'Si el correo existe pero es una cuenta de Google, responde con un aviso explicito '
+            '(esas cuentas no tienen password que restablecer). Si el correo no existe, responde '
+            'el mismo mensaje generico que un envio exitoso, para no filtrar informacion.'
         ),
         request=OlvidePasswordSerializer,
         responses={200: MensajeSerializer},
@@ -178,9 +193,11 @@ class OlvidePasswordView(APIView):
         serializer = OlvidePasswordSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        usuario = Usuario.objects.filter(
-            correo=serializer.validated_data['correo'], provider=Usuario.PROVIDER_LOCAL
-        ).first()
+        usuario = Usuario.objects.filter(correo=serializer.validated_data['correo']).first()
+
+        if usuario is not None and usuario.provider == Usuario.PROVIDER_GOOGLE:
+            raise ValidationError('Esta cuenta inicio sesion con Google. No tiene password para restablecer.')
+
         if usuario is not None:
             generar_y_enviar_otp(usuario, CodigoOTP.TIPO_RESET_PASSWORD)
 
@@ -208,6 +225,9 @@ class ResetPasswordView(APIView):
         except Usuario.DoesNotExist:
             raise ValidationError('Usuario no encontrado.')
 
+        if usuario.provider == Usuario.PROVIDER_GOOGLE:
+            raise ValidationError('Esta cuenta inicio sesion con Google. No tiene password para restablecer.')
+
         validar_otp(usuario, datos['codigo'], CodigoOTP.TIPO_RESET_PASSWORD)
 
         usuario.set_password(datos['nueva_password'])
@@ -215,6 +235,41 @@ class ResetPasswordView(APIView):
         _revocar_refresh_tokens(usuario)
 
         return Response({'mensaje': 'Password actualizado correctamente.'})
+
+
+@method_decorator(ratelimit(key=RATE_AUTH, rate='10/m', method='POST', block=True), name='post')
+class CambiarPasswordView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        tags=[TAG_USUARIOS],
+        summary='Cambiar password (logueado)',
+        description=(
+            'Cambia el password del usuario autenticado, verificando el password actual. '
+            'No disponible para cuentas `provider=google`. Revoca los refresh tokens previos y '
+            'devuelve un par de tokens nuevo para que la sesion actual siga funcionando.'
+        ),
+        request=CambiarPasswordSerializer,
+        responses={200: MensajeConTokensSerializer},
+    )
+    def post(self, request):
+        usuario = request.user
+
+        if usuario.provider == Usuario.PROVIDER_GOOGLE:
+            raise ValidationError('Esta cuenta inicio sesion con Google. No tiene password para cambiar.')
+
+        serializer = CambiarPasswordSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        datos = serializer.validated_data
+
+        if not usuario.check_password(datos['password_actual']):
+            raise ValidationError('La contraseña actual es incorrecta.')
+
+        usuario.set_password(datos['nueva_password'])
+        usuario.save(update_fields=['password'])
+        _revocar_refresh_tokens(usuario)
+
+        return Response({'mensaje': 'Password actualizado correctamente.', **_tokens_para(usuario)})
 
 
 @extend_schema_view(

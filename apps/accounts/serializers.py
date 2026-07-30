@@ -41,6 +41,11 @@ class ResetPasswordSerializer(serializers.Serializer):
     nueva_password = serializers.CharField(write_only=True, validators=[validate_password])
 
 
+class CambiarPasswordSerializer(serializers.Serializer):
+    password_actual = serializers.CharField(write_only=True)
+    nueva_password = serializers.CharField(write_only=True, validators=[validate_password])
+
+
 class UsuarioSerializer(serializers.ModelSerializer):
     pais = serializers.CharField(validators=[validar_codigo_pais])
 
@@ -68,3 +73,9 @@ class TokenSerializer(serializers.Serializer):
 
 class MensajeSerializer(serializers.Serializer):
     mensaje = serializers.CharField()
+
+
+class MensajeConTokensSerializer(serializers.Serializer):
+    mensaje = serializers.CharField()
+    access = serializers.CharField()
+    refresh = serializers.CharField()

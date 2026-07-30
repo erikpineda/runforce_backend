@@ -85,6 +85,78 @@ class GoogleAuthTests(APITestCase):
         self.assertEqual(usuario.provider, Usuario.PROVIDER_GOOGLE)
         self.assertEqual(usuario.estado, Usuario.ESTADO_ACTIVO)
 
+    @patch('apps.accounts.views.validar_google_id_token')
+    def test_google_rechaza_si_ya_existe_cuenta_local(self, mock_validar):
+        Usuario.objects.create_user(
+            correo='ya.registrado@example.com', password='clave-segura-123',
+            nombre_completo='Ya Registrado', pais='HN', estado=Usuario.ESTADO_ACTIVO,
+        )
+        mock_validar.return_value = {
+            'sub': 'google-uid-999',
+            'email': 'ya.registrado@example.com',
+            'name': 'Ya Registrado',
+        }
+        google_url = reverse('auth-google')
+        respuesta = self.client.post(google_url, {'id_token': 'token-falso'})
+        self.assertEqual(respuesta.status_code, status.HTTP_400_BAD_REQUEST)
+
+        usuario = Usuario.objects.get(correo='ya.registrado@example.com')
+        self.assertEqual(usuario.provider, Usuario.PROVIDER_LOCAL)
+        self.assertIsNone(usuario.google_id)
+
+
+class PasswordGoogleRestrictionTests(APITestCase):
+    def setUp(self):
+        self.usuario_google = Usuario.objects.create(
+            correo='google@example.com', nombre_completo='Google User', pais='HN',
+            provider=Usuario.PROVIDER_GOOGLE, google_id='google-uid-1', estado=Usuario.ESTADO_ACTIVO,
+        )
+        self.usuario_google.set_unusable_password()
+        self.usuario_google.save()
+
+    def test_olvide_password_rechaza_cuenta_google(self):
+        respuesta = self.client.post(reverse('auth-olvide-password'), {'correo': 'google@example.com'})
+        self.assertEqual(respuesta.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_cambiar_password_rechaza_cuenta_google(self):
+        self.client.force_authenticate(user=self.usuario_google)
+        respuesta = self.client.post(reverse('usuario-me-password'), {
+            'password_actual': 'lo-que-sea',
+            'nueva_password': 'clave-nueva-segura-123',
+        })
+        self.assertEqual(respuesta.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class CambiarPasswordViewTests(APITestCase):
+    def setUp(self):
+        self.usuario = Usuario.objects.create_user(
+            correo='local@example.com', password='clave-vieja-123',
+            nombre_completo='Local', pais='HN', estado=Usuario.ESTADO_ACTIVO,
+        )
+        self.client.force_authenticate(user=self.usuario)
+
+    def test_cambiar_password_exitoso(self):
+        respuesta = self.client.post(reverse('usuario-me-password'), {
+            'password_actual': 'clave-vieja-123',
+            'nueva_password': 'clave-nueva-segura-456',
+        })
+        self.assertEqual(respuesta.status_code, status.HTTP_200_OK)
+        self.assertIn('access', respuesta.data)
+        self.assertIn('refresh', respuesta.data)
+
+        self.usuario.refresh_from_db()
+        self.assertTrue(self.usuario.check_password('clave-nueva-segura-456'))
+
+    def test_cambiar_password_actual_incorrecto(self):
+        respuesta = self.client.post(reverse('usuario-me-password'), {
+            'password_actual': 'password-incorrecto',
+            'nueva_password': 'clave-nueva-segura-456',
+        })
+        self.assertEqual(respuesta.status_code, status.HTTP_400_BAD_REQUEST)
+
+        self.usuario.refresh_from_db()
+        self.assertTrue(self.usuario.check_password('clave-vieja-123'))
+
 
 class RefreshTokenTests(APITestCase):
     def test_refresh_token_entrega_nuevo_access(self):
