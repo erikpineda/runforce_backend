@@ -27,16 +27,16 @@ class UsuarioModelTests(TestCase):
         self.assertTrue(admin.is_superuser)
         self.assertTrue(admin.is_active)
 
-    def test_meta_racha_semanal_es_opcional(self):
+    def test_meta_semanal_km_es_opcional(self):
         usuario = Usuario.objects.create_user(
             correo='sinmeta@example.com', password='clave-segura-123', nombre_completo='Sin Meta', pais='HN'
         )
-        self.assertIsNone(usuario.meta_racha_semanal)
+        self.assertIsNone(usuario.meta_semanal_km)
 
-    def test_meta_racha_semanal_rechaza_fuera_de_rango(self):
+    def test_meta_semanal_km_rechaza_fuera_de_rango(self):
         usuario = Usuario.objects.create_user(
             correo='conmeta@example.com', password='clave-segura-123', nombre_completo='Con Meta', pais='HN',
-            meta_racha_semanal=8,
+            meta_semanal_km=0,
         )
         with self.assertRaises(ValidationError):
             usuario.full_clean()

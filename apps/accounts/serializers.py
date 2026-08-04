@@ -85,7 +85,7 @@ class UsuarioSerializer(serializers.ModelSerializer):
         model = Usuario
         fields = [
             'id', 'nombre_completo', 'correo', 'pais', 'foto_url',
-            'peso_kg', 'meta_racha_semanal', 'provider', 'estado', 'creado_en',
+            'peso_kg', 'meta_semanal_km', 'provider', 'estado', 'creado_en',
         ]
         read_only_fields = ['id', 'correo', 'provider', 'estado', 'creado_en', 'foto_url']
 

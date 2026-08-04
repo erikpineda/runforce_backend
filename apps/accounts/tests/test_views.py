@@ -184,7 +184,7 @@ class CambiarPasswordViewTests(APITestCase):
         self.assertTrue(self.usuario.check_password('clave-vieja-123'))
 
 
-class UsuarioMeMetaRachaSemanalTests(APITestCase):
+class UsuarioMeMetaSemanalKmTests(APITestCase):
     def setUp(self):
         self.usuario = Usuario.objects.create_user(
             correo='racha@example.com', password='clave-segura-123',
@@ -192,16 +192,16 @@ class UsuarioMeMetaRachaSemanalTests(APITestCase):
         )
         self.client.force_authenticate(user=self.usuario)
 
-    def test_actualizar_meta_racha_semanal(self):
-        respuesta = self.client.patch(reverse('usuario-me'), {'meta_racha_semanal': 4})
+    def test_actualizar_meta_semanal_km(self):
+        respuesta = self.client.patch(reverse('usuario-me'), {'meta_semanal_km': 15})
         self.assertEqual(respuesta.status_code, status.HTTP_200_OK)
-        self.assertEqual(respuesta.data['meta_racha_semanal'], 4)
+        self.assertEqual(respuesta.data['meta_semanal_km'], '15.00')
 
         self.usuario.refresh_from_db()
-        self.assertEqual(self.usuario.meta_racha_semanal, 4)
+        self.assertEqual(self.usuario.meta_semanal_km, 15)
 
-    def test_rechaza_meta_racha_semanal_fuera_de_rango(self):
-        respuesta = self.client.patch(reverse('usuario-me'), {'meta_racha_semanal': 8})
+    def test_rechaza_meta_semanal_km_fuera_de_rango(self):
+        respuesta = self.client.patch(reverse('usuario-me'), {'meta_semanal_km': 0})
         self.assertEqual(respuesta.status_code, status.HTTP_400_BAD_REQUEST)
 
 

@@ -1,5 +1,7 @@
+from decimal import Decimal
+
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
-from django.core.validators import MaxValueValidator, MinValueValidator
+from django.core.validators import MinValueValidator
 from django.db import models
 
 from .managers import UsuarioManager
@@ -25,10 +27,10 @@ class Usuario(AbstractBaseUser, PermissionsMixin):
     pais = models.CharField(max_length=100)
     foto_url = models.URLField(null=True, blank=True)
     peso_kg = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
-    meta_racha_semanal = models.PositiveSmallIntegerField(
-        null=True, blank=True,
-        validators=[MinValueValidator(1), MaxValueValidator(7)],
-        help_text='Dias por semana que el usuario se propone correr, para mantener su racha.',
+    meta_semanal_km = models.DecimalField(
+        max_digits=6, decimal_places=2, null=True, blank=True,
+        validators=[MinValueValidator(Decimal('0.1'))],
+        help_text='Kilometros que el usuario se propone correr por semana, para mantener su racha.',
     )
     provider = models.CharField(max_length=10, choices=PROVIDER_CHOICES, default=PROVIDER_LOCAL)
     google_id = models.CharField(max_length=255, null=True, blank=True, unique=True)
