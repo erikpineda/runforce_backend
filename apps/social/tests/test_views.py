@@ -4,6 +4,7 @@ from rest_framework.test import APITestCase
 
 from apps.accounts.models import Usuario
 from apps.runs.models import Carrera
+from apps.social.services import _restar_meses
 
 
 class RankingTests(APITestCase):
@@ -43,3 +44,30 @@ class RankingTests(APITestCase):
         self.assertEqual(respuesta.status_code, status.HTTP_200_OK)
         self.assertEqual(len(respuesta.data), 2)
         self.assertEqual(respuesta.data[0]['usuario_id'], self.amigo.id)
+
+    def test_ranking_desplazamiento_muestra_mes_anterior(self):
+        # timedelta(days=35) no sirve aqui: segun el dia del mes en que corra
+        # el test, 35 dias atras puede caer dos meses atras en vez de uno.
+        # Se usa el mismo helper que la vista para ubicar la fecha sin ambiguedad.
+        mes_pasado = _restar_meses(timezone.now(), 1)
+        Carrera.objects.create(
+            usuario=self.usuario, titulo='Ruta vieja', distancia_km='7.000',
+            duracion_seg=2000, iniciada_en=mes_pasado,
+        )
+
+        respuesta_actual = self.client.get('/api/v1/ranking?periodo=mes')
+        self.assertEqual(respuesta_actual.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(respuesta_actual.data), 0)
+
+        respuesta_anterior = self.client.get('/api/v1/ranking?periodo=mes&desplazamiento=1')
+        self.assertEqual(respuesta_anterior.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(respuesta_anterior.data), 1)
+        self.assertEqual(respuesta_anterior.data[0]['usuario_id'], self.usuario.id)
+
+    def test_ranking_rechaza_desplazamiento_negativo(self):
+        respuesta = self.client.get('/api/v1/ranking?desplazamiento=-1')
+        self.assertEqual(respuesta.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_ranking_rechaza_desplazamiento_fuera_de_rango(self):
+        respuesta = self.client.get('/api/v1/ranking?desplazamiento=121')
+        self.assertEqual(respuesta.status_code, status.HTTP_400_BAD_REQUEST)

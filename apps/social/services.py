@@ -1,5 +1,8 @@
+from datetime import timedelta
+
 from django.contrib.auth import get_user_model
 from django.db.models import Sum
+from django.utils import timezone
 
 from apps.runs.models import Carrera
 from apps.runs.services import mes_actual_y_anterior, semana_actual_y_anterior
@@ -24,16 +27,31 @@ def agregar_amigo(usuario, amigo):
     )
 
 
-def _rango_periodo(periodo):
+def _restar_meses(fecha, meses):
+    """Retrocede 'meses' meses calendario. rango_mes() solo usa año/mes de
+    la fecha que recibe (siempre fija el día en 1), asi que no hace falta
+    preservar el día original ni lidiar con meses de distinta longitud."""
+    mes_total = fecha.month - 1 - meses
+    anio = fecha.year + mes_total // 12
+    mes = mes_total % 12 + 1
+    return fecha.replace(year=anio, month=mes, day=1)
+
+
+def _rango_periodo(periodo, desplazamiento=0):
+    ahora = timezone.now()
     if periodo == 'semana':
-        (inicio, fin), _ = semana_actual_y_anterior()
+        if desplazamiento:
+            ahora = ahora - timedelta(days=7 * desplazamiento)
+        (inicio, fin), _ = semana_actual_y_anterior(ahora)
     else:
-        (inicio, fin), _ = mes_actual_y_anterior()
+        if desplazamiento:
+            ahora = _restar_meses(ahora, desplazamiento)
+        (inicio, fin), _ = mes_actual_y_anterior(ahora)
     return inicio, fin
 
 
-def construir_ranking(usuario, pais=None, periodo='mes'):
-    inicio, fin = _rango_periodo(periodo)
+def construir_ranking(usuario, pais=None, periodo='mes', desplazamiento=0):
+    inicio, fin = _rango_periodo(periodo, desplazamiento)
 
     if pais:
         usuarios_qs = Usuario.objects.filter(pais=pais, estado=Usuario.ESTADO_ACTIVO)

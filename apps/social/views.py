@@ -82,6 +82,7 @@ class AmigosListCreateView(APIView):
 
 class RankingView(APIView):
     permission_classes = [IsAuthenticated]
+    MAX_DESPLAZAMIENTO = 120
 
     @extend_schema(
         tags=[TAG_SOCIAL],
@@ -93,6 +94,10 @@ class RankingView(APIView):
         parameters=[
             OpenApiParameter('pais', str, description='Si se indica, ignora la lista de amigos'),
             OpenApiParameter('periodo', str, description='`mes` (default) o `semana`'),
+            OpenApiParameter(
+                'desplazamiento', int,
+                description='Periodos hacia atras desde el actual (0 = actual, 1 = el anterior, etc.). Maximo 120.',
+            ),
         ],
         responses={200: RankingItemSerializer(many=True)},
     )
@@ -102,5 +107,13 @@ class RankingView(APIView):
         if periodo not in ('mes', 'semana'):
             raise ValidationError('El parametro `periodo` debe ser `mes` o `semana`.')
 
-        ranking = construir_ranking(request.user, pais=pais, periodo=periodo)
+        desplazamiento_texto = request.query_params.get('desplazamiento', '0')
+        try:
+            desplazamiento = int(desplazamiento_texto)
+        except ValueError:
+            raise ValidationError('El parametro `desplazamiento` debe ser un numero entero.')
+        if desplazamiento < 0 or desplazamiento > self.MAX_DESPLAZAMIENTO:
+            raise ValidationError(f'El parametro `desplazamiento` debe estar entre 0 y {self.MAX_DESPLAZAMIENTO}.')
+
+        ranking = construir_ranking(request.user, pais=pais, periodo=periodo, desplazamiento=desplazamiento)
         return Response(RankingItemSerializer(ranking, many=True).data)
