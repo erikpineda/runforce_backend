@@ -1,4 +1,5 @@
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
 from .managers import UsuarioManager
@@ -24,6 +25,11 @@ class Usuario(AbstractBaseUser, PermissionsMixin):
     pais = models.CharField(max_length=100)
     foto_url = models.URLField(null=True, blank=True)
     peso_kg = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    meta_racha_semanal = models.PositiveSmallIntegerField(
+        null=True, blank=True,
+        validators=[MinValueValidator(1), MaxValueValidator(7)],
+        help_text='Dias por semana que el usuario se propone correr, para mantener su racha.',
+    )
     provider = models.CharField(max_length=10, choices=PROVIDER_CHOICES, default=PROVIDER_LOCAL)
     google_id = models.CharField(max_length=255, null=True, blank=True, unique=True)
     estado = models.CharField(max_length=10, choices=ESTADO_CHOICES, default=ESTADO_PENDIENTE)

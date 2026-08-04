@@ -15,7 +15,7 @@ class UsuarioAdmin(UserAdmin):
 
     fieldsets = (
         (None, {'fields': ('correo', 'password')}),
-        ('Informacion personal', {'fields': ('nombre_completo', 'pais', 'foto_url', 'peso_kg')}),
+        ('Informacion personal', {'fields': ('nombre_completo', 'pais', 'foto_url', 'peso_kg', 'meta_racha_semanal')}),
         ('Autenticacion', {'fields': ('provider', 'google_id', 'estado')}),
         ('Permisos', {'fields': ('is_staff', 'is_superuser', 'groups', 'user_permissions')}),
         ('Fechas', {'fields': ('last_login', 'creado_en')}),
